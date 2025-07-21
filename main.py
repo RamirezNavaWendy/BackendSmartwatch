@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
-#from typing import List, Optional
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
+import os
+from transformers import pipeline
+from openai import OpenAI
 
 
 app = FastAPI()
@@ -13,23 +13,37 @@ class Transcripcion(BaseModel):
     fecha: str
     texto: str
 
-# Carga del modelo FLAN-T5
-tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
-model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 # Función de limpieza con IA
-def limpiar_con_flan(texto: str) -> str:
-    instruccion = f"Corrige y mejora este texto: {texto}"
-    inputs = tokenizer(instruccion, return_tensors="pt", max_length=512, truncation=True)
-    outputs = model.generate(**inputs, max_new_tokens=512)
-    texto_limpio = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return texto_limpio
+def limpiar_con_gpt(texto: str) -> str:
+    print(" Enviando texto a OpenAI:", texto)
+    prompt = f"Corrige este texto eliminando muletillas y mejorando su claridad:\n{texto}"
+
+    try:
+        respuesta = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        texto_limpio = respuesta.choices[0].message.content.strip()
+        print(" Respuesta de OpenAI:", texto_limpio)
+        return texto_limpio
+    except Exception as e:
+        print(" Error al llamar a OpenAI:", str(e))
+        return "Error al procesar el texto con OpenAI"
+
+
 
 
 #Endpoint que recibe y procesa
 @app.post("/recibir-clase/")
 async def recibir_clase(datos: Transcripcion):
-    texto_limpio = limpiar_con_flan(datos.texto)
+    texto_limpio = limpiar_con_gpt(datos.texto)
+
 
     return {
         "estado": "procesado",
