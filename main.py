@@ -1,26 +1,36 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, UploadFile, File
 from pydantic import BaseModel
-import uvicorn
-import os
+from datetime import datetime
 from transformers import pipeline
 from openai import OpenAI
+import uvicorn
+import os
+import json
+import tempfile
+import whisper
+
 
 
 app = FastAPI()
+
+# Cargar modelo Whisper
+model_whisper = whisper.load_model("base")
+TRANSCRIPCIONES_DIR = "transcripciones"
+os.makedirs(TRANSCRIPCIONES_DIR, exist_ok=True)
 
 # Modelo de datos esperado desde el smartwatch
 class Transcripcion(BaseModel):
     fecha: str
     texto: str
 
-
+#Cliente OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # Función de limpieza con IA
 def limpiar_con_gpt(texto: str) -> str:
     print(" Enviando texto a OpenAI:", texto)
-    prompt = f"Corrige este texto eliminando muletillas y mejorando su claridad:\n{texto}"
+    prompt = f"Corrige este texto eliminando muletillas y mejorando su claridad, si ya es bastante claro y coherente dejalo tal cual únicamente eliminando las muletillas y ruidos inutiles:\n{texto}"
 
     try:
         respuesta = client.chat.completions.create(
@@ -51,6 +61,47 @@ async def recibir_clase(datos: Transcripcion):
         "original": datos.texto,
         "limpio": texto_limpio
     }
+
+
+# Endpoint para transcribir audio con Whisper
+@app.post("/whisper-transcribe/")
+async def transcribe_audio(file: UploadFile = File(...)):
+    temp_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+
+    try:
+        with open(temp_path, "wb") as f:
+            f.write(await file.read())
+
+        result = model_whisper.transcribe(temp_path, language=None)
+        texto_raw = result["text"]
+        idioma = result.get("language", "en")
+        fecha = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+        # Limpieza con GPT
+        texto_limpio = limpiar_con_gpt(texto_raw)
+
+        # Guardar transcripción cruda
+        json_data = {
+            "fecha": fecha,
+            "original": texto_raw,
+            "limpio": texto_limpio,
+            "idioma": idioma
+        }
+
+        json_filename = f"transcripcion_{fecha}.json"
+        json_path = os.path.join(TRANSCRIPCIONES_DIR, json_filename)
+
+        with open(json_path, "w", encoding="utf-8") as json_file:
+            json.dump(json_data, json_file, ensure_ascii=False, indent=4)
+
+        return json_data
+
+    except Exception as e:
+        return {"error": f"Error en transcripción o limpieza: {str(e)}"}
+
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 #Arrancar el servidor
