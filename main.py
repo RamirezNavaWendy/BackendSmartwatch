@@ -46,20 +46,36 @@ def limpiar_con_gpt(texto: str) -> str:
         print(" Error al llamar a OpenAI:", str(e))
         return "Error al procesar el texto con OpenAI"
 
-
-
+#Genera un titulo para el texto limpio
+def generar_titulo(texto_limpio):
+    prompt = f"Genera un título académico breve y descriptivo para el siguiente texto:\n\n{texto_limpio}"
+    try:
+        respuesta = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        modelo_respuesta = respuesta.choices[0].message.content.strip()
+        print(" Respuesta de OpenAI:", modelo_respuesta)
+        return modelo_respuesta
+    except Exception as e:
+        print(" Error al llamar a OpenAI:", str(e))
+        return "Error al procesar el texto con OpenAI"
 
 #Endpoint que recibe y procesa
 @app.post("/recibir-clase/")
 async def recibir_clase(datos: Transcripcion):
     texto_limpio = limpiar_con_gpt(datos.texto)
-
+    titulo_raw = generar_titulo(texto_limpio)
+    titulo_limpio = titulo_raw.strip('"')
 
     return {
         "estado": "procesado",
         "fecha": datos.fecha,
         "original": datos.texto,
-        "limpio": texto_limpio
+        "limpio": texto_limpio,
+        "titulo": titulo_limpio
     }
 
 
@@ -80,12 +96,17 @@ async def transcribe_audio(file: UploadFile = File(...)):
         # Limpieza con GPT
         texto_limpio = limpiar_con_gpt(texto_raw)
 
+        # Título generado
+        titulo_raw = generar_titulo(texto_limpio)
+        titulo_limpio = titulo_raw.strip('"')
+
         # Guardar transcripción cruda
         json_data = {
             "fecha": fecha,
             "original": texto_raw,
             "limpio": texto_limpio,
-            "idioma": idioma
+            "idioma": idioma,
+            "titulo": titulo_limpio
         }
 
         json_filename = f"transcripcion_{fecha}.json"
