@@ -25,9 +25,11 @@ def escapar_caracteres_latex(texto: str) -> str:
 def validar_contenido_latex(documento_latex: str,idioma: str = 'en') -> list:
     #Valida el contenido LaTeX considerando el idioma del documento
     errores = []
+    config = obtener_config_idioma(idioma)
+
 
     contenido_match = re.search(
-        r"\\section\*\{Contenido\}(.*?)\\section\*\{Páginas recomendadas\}",
+        rf"\\section\*\{{{config['seccion_contenido']}\}}(.*?)\\section\*\{{{config['seccion_enlaces']}\}}",
         documento_latex,
         re.DOTALL
     )
@@ -63,13 +65,13 @@ def obtener_config_idioma(codigo_idioma: str) -> dict:
         'es': {
             'babel': 'spanish',
             'seccion_contenido': 'Contenido',
-            'seccion_enlaces': 'Páginas recomendadas',
+            'seccion_enlaces': 'Contenido sugerido por gpt',
             'sin_enlaces': 'No se encontraron sugerencias relevantes.'
         },
         'en': {
             'babel': 'english',
             'seccion_contenido': 'Content',
-            'seccion_enlaces': 'Recommended Pages',
+            'seccion_enlaces': 'Gpt suggested content',
             'sin_enlaces': 'No relevant suggestions found.'
         }
     }
@@ -81,7 +83,7 @@ def obtener_config_idioma(codigo_idioma: str) -> dict:
 
 
 #Generador de código LaTeX - MULTIIDIOMA
-def generar_latex(titulo, texto_limpio, enlaces_recomendados=None, idioma='en'):
+def generar_latex(titulo, texto_limpio, contenido_enriquecido=None, idioma='en'):
     texto_limpio = escapar_caracteres_latex(texto_limpio)
     titulo = escapar_caracteres_latex(titulo)
     
@@ -90,16 +92,16 @@ def generar_latex(titulo, texto_limpio, enlaces_recomendados=None, idioma='en'):
     
     print(f"Generando LaTeX en idioma: {idioma} (babel: {config['babel']})")
 
-    #CORREGIDO: Generar enlaces correctamente
-    if enlaces_recomendados and len(enlaces_recomendados) > 0:
-        enlaces_latex = ""
-        for enlace in enlaces_recomendados:
-            titulo_enlace = escapar_caracteres_latex(enlace['titulo'])
-            url_enlace = escapar_url(enlace['url'])
-            enlaces_latex += f"\\item \\textbf{{{titulo_enlace}}}: \\url{{{url_enlace}}}\n"
-        enlaces_latex = enlaces_latex.rstrip('\n')  # Remover último salto de línea
+    #Contenido sugerido
+    #Contenido sugerido
+    if contenido_enriquecido:
+        sugerencias = contenido_enriquecido.split("\n")  # Ajusta según cómo lo recibas
+        contenido_sugerido = generar_itemize(sugerencias)
     else:
-        enlaces_latex = f"\\item {config['sin_enlaces']}"
+        contenido_sugerido = generar_itemize([])
+
+
+
 
     # PLANTILLA MULTIIDIOMA
     return f"""\\documentclass[12pt]{{article}}
@@ -123,10 +125,9 @@ def generar_latex(titulo, texto_limpio, enlaces_recomendados=None, idioma='en'):
 \\section*{{{config['seccion_contenido']}}}
 {texto_limpio}
 
-\\section*{{{config['seccion_enlaces']}}}
-\\begin{{itemize}}[leftmargin=*]
-{enlaces_latex}
-\\end{{itemize}}
+\section*{{{config['seccion_enlaces']}}}
+{contenido_sugerido}
+
 
 \\end{{document}}"""
 
@@ -187,7 +188,7 @@ def guardar_pdf_en_mongo(pdf_bytes: bytes, metadata: dict) -> Union[str, ObjectI
             "fecha": metadata.get("fecha", "Sin fecha"),
             "texto_limpio": metadata.get("texto_limpio", ""),
             "idioma": metadata.get("idioma", "desconocido"),
-            "enlaces_recomendados": metadata.get("enlaces_recomendados", [])
+            "contenido_enriquecido": metadata.get("contenido_enriquecido", "")
         }
 
         titulo_corto = generar_titulo_corto(metadata["titulo"])
@@ -212,15 +213,15 @@ def guardar_pdf_en_mongo(pdf_bytes: bytes, metadata: dict) -> Union[str, ObjectI
 
 #Flujo principal
 def procesar_transcripcion(data: dict) -> str:
-    enlaces = data.get("enlaces_recomendados")
+    contenido_enriquecido = data.get("contenido_enriquecido")
     idioma = data.get("idioma", "en")  # Idioma detectado por Whisper
 
 
-    print("🔧 Generando código LaTeX...")
+    print(" Generando código LaTeX...")
     tex_code = generar_latex(
         titulo=data["titulo"],
         texto_limpio=data["texto_limpio"],
-        enlaces_recomendados=enlaces,
+        contenido_enriquecido=contenido_enriquecido,
         idioma=idioma
     )
 
@@ -228,7 +229,7 @@ def procesar_transcripcion(data: dict) -> str:
     print(tex_code)
     print("=" * 50)
 
-    print("🔍 Validando contenido LaTeX...")
+    print(" Validando contenido LaTeX...")
     errores = validar_contenido_latex(tex_code,idioma)
     if errores:
         print("Errores detectados en el contenido LaTeX:")
@@ -244,3 +245,10 @@ def procesar_transcripcion(data: dict) -> str:
         return guardar_pdf_en_mongo(pdf_bytes, data)
     print(f" Error en compilación: {pdf_bytes}")
     return "compilacion_fallida"
+
+
+def generar_itemize(sugerencias: list[str]) -> str:
+    if not sugerencias:
+        return "\\textit{No se encontraron sugerencias relevantes.}"
+    items = "\n".join([f"\\item {s}" for s in sugerencias])
+    return f"\\begin{{itemize}}[leftmargin=*]\n{items}\n\\end{{itemize}}"

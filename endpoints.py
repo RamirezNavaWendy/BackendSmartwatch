@@ -7,7 +7,7 @@ from bson import ObjectId
 from modelos import client
 from schemas import TextoEntrada
 from mongo import fs
-
+from logica import generar_contenido_enriquecido
 
 
 from modelos import model_whisper
@@ -28,6 +28,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
     temp_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
 
     try:
+
         with open(temp_path, "wb") as f:
             f.write(await file.read())
 
@@ -42,11 +43,14 @@ async def transcribe_audio(file: UploadFile = File(...)):
         titulo_raw = generar_titulo(texto_limpio,idioma)
         titulo_limpio = titulo_raw.strip('"')
 
+        contenido_enriquecido = generar_contenido_enriquecido(texto_limpio, idioma)
+
         metadata = {
             "titulo": titulo_limpio,
             "fecha": fecha,
             "texto_limpio": texto_limpio,
-            "idioma": idioma
+            "idioma": idioma,
+            "contenido_enriquecido": contenido_enriquecido
         }
 
         mongo_id = procesar_transcripcion(metadata)
@@ -156,23 +160,5 @@ Texto:
     return {"tema": tema}
 
 
-@router.post("/buscar-enlaces/")
-def buscar_enlaces(tema: str):
-    prompt = f"""Dame una lista de 10 páginas web relevantes sobre el siguiente tema: \"{tema}\".
-Incluye el título y el enlace de cada una. El formato debe ser JSON con campos 'titulo' y 'url'."""
-
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    contenido = response.choices[0].message.content.strip()
-
-    import json
-    try:
-        enlaces = json.loads(contenido)
-    except json.JSONDecodeError:
-        enlaces = []
-
-    return {"enlaces": enlaces}
 
 

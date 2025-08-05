@@ -58,3 +58,44 @@ def generar_titulo_corto(titulo_largo: str) -> str:
     limpio = re.sub(r'[\\/*?:"<>|]', '', titulo_largo)
     # Recorta a 30 caracteres y elimina espacios finales
     return limpio[:30].strip()
+
+# Genera contenido enriquecido a partir del texto limpio - MULTIIDIOMA
+def generar_contenido_enriquecido(texto_limpio: str, idioma: str = "en") -> str:
+    print(f" Generando contenido enriquecido (idioma: {idioma})...")
+
+    prompts = {
+        'es': f"""A partir del siguiente texto, genera un contenido enriquecido que incluya:
+
+- Un resumen breve (100 palabras)
+- 5 ideas clave
+- 3 preguntas de reflexión
+
+Texto:
+\"\"\"{texto_limpio}\"\"\"
+""",
+        'en': f"""Based on the following text, generate enriched content including:
+
+- A brief summary (100 words)
+- 5 key ideas
+- 3 reflective questions
+
+Text:
+\"\"\"{texto_limpio}\"\"\"
+"""
+    }
+
+    prompt = prompts.get(idioma, prompts['en'])
+
+    try:
+        respuesta = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        contenido = respuesta.choices[0].message.content.strip()
+        print(" Contenido enriquecido generado:", contenido[:100] + "...")
+        return contenido
+    except Exception as e:
+        print(" Error al generar contenido enriquecido:", str(e))
+        return ""
