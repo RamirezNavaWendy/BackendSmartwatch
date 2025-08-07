@@ -1,16 +1,16 @@
 from modelos import client
 
-# Función de limpieza con IA - MULTIIDIOMA
+# Función de limpieza con IA 
 def limpiar_con_gpt(texto: str, idioma: str = "en") -> str:
     print(f" Enviando texto a OpenAI (idioma: {idioma}):", texto[:100] + "...")
     
-    # Prompts en diferentes idiomas
+    # Prompts es/en
     prompts = {
         'es': f"Corrige este texto eliminando muletillas y mejorando su claridad. Si ya es bastante claro y coherente déjalo tal cual únicamente eliminando las muletillas y ruidos inútiles:\n{texto}",
         'en': f"Clean this text by removing filler words and improving clarity. If it's already clear and coherent, leave it as is, only removing filler words and unnecessary noise:\n{texto}"
     }
     
-    prompt = prompts.get(idioma, prompts['en'])  # Default a inglés si no existe el idioma
+    prompt = prompts.get(idioma, prompts['en'])  
 
     try:
         respuesta = client.chat.completions.create(
@@ -26,10 +26,10 @@ def limpiar_con_gpt(texto: str, idioma: str = "en") -> str:
         print(" Error al llamar a OpenAI:", str(e))
         return "Error al procesar el texto con OpenAI"
 
-# Genera un título para el texto limpio - MULTIIDIOMA
+# Genera un título para el texto limpio 
 def generar_titulo(texto_limpio: str, idioma: str = "en") -> str:
     
-    # Prompts para generar títulos en diferentes idiomas
+    # Prompts para generar títulos en/es
     prompts = {
         'es': f"Genera un título académico breve y descriptivo para el siguiente texto:\n\n{texto_limpio}",
         'en': f"Generate a brief and descriptive academic title for the following text:\n\n{texto_limpio}"
@@ -59,29 +59,29 @@ def generar_titulo_corto(titulo_largo: str) -> str:
     # Recorta a 30 caracteres y elimina espacios finales
     return limpio[:30].strip()
 
-# Genera contenido enriquecido a partir del texto limpio - MULTIIDIOMA
+# Genera contenido enriquecido a partir del texto limpio - es/en
 def generar_contenido_enriquecido(texto_limpio: str, idioma: str = "en") -> str:
     print(f" Generando contenido enriquecido (idioma: {idioma})...")
 
     prompts = {
         'es': f"""A partir del siguiente texto, genera un contenido enriquecido que incluya:
 
-- Un resumen breve (100 palabras)
-- 5 ideas clave
-- 3 preguntas de reflexión
+        - Un resumen breve (100 palabras)
+        - 5 ideas clave
+        - 3 preguntas de reflexión
 
-Texto:
-\"\"\"{texto_limpio}\"\"\"
-""",
-        'en': f"""Based on the following text, generate enriched content including:
+        Texto:
+        \"\"\"{texto_limpio}\"\"\"
+        """,
+                'en': f"""Based on the following text, generate enriched content including:
 
-- A brief summary (100 words)
-- 5 key ideas
-- 3 reflective questions
+        - A brief summary (100 words)
+        - 5 key ideas
+        - 3 reflective questions
 
-Text:
-\"\"\"{texto_limpio}\"\"\"
-"""
+        Text:
+        \"\"\"{texto_limpio}\"\"\"
+        """
     }
 
     prompt = prompts.get(idioma, prompts['en'])

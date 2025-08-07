@@ -95,7 +95,7 @@ def generar_latex(titulo, texto_limpio, contenido_enriquecido=None, idioma='en')
     #Contenido sugerido
     #Contenido sugerido
     if contenido_enriquecido:
-        sugerencias = contenido_enriquecido.split("\n")  # Ajusta según cómo lo recibas
+        sugerencias = contenido_enriquecido.split("\n") 
         contenido_sugerido = generar_itemize(sugerencias)
     else:
         contenido_sugerido = generar_itemize([])
